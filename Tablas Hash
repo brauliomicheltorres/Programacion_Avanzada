@@ -1,0 +1,200 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define TABLE_SIZE 10
+
+// creando estructura
+typedef struct Node {
+    char* key;
+    char* value;
+    struct Node* next;
+} Node;
+
+// Estructura de la Tabla Hash
+typedef struct HashTable {
+    Node* table[TABLE_SIZE];
+} HashTable;
+
+// Función auxiliar para copiar cadenas de texto 
+char* duplicate_string(const char* str) {
+    if (str == NULL) return NULL;
+    size_t len = strlen(str) + 1;
+    char* copy = (char*)malloc(len);
+    if (copy != NULL) {
+        memcpy(copy, str, len);
+    }
+    return copy;
+}
+
+// Función Hash simple 
+int hash_function(const char* key) {
+    int hash = 0;
+    while (*key) {
+        hash += *key;
+        key++;
+    }
+    return hash % TABLE_SIZE;
+}
+
+// Crear e inicializando mi tablas HASH
+HashTable* create_table() {
+    HashTable* ht = (HashTable*)malloc(sizeof(HashTable));
+    if (ht == NULL) {
+        fprintf(stderr, "Error al asignar memoria para la tabla hash.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    for (int i = 0; i < TABLE_SIZE; i++) {
+        ht->table[i] = NULL;
+    }
+    return ht;
+}
+
+// Crear un nuevo nodo
+Node* create_node(const char* key, const char* value) {
+    Node* new_node = (Node*)malloc(sizeof(Node));
+    if (new_node == NULL) {
+        fprintf(stderr, "Error al asignar memoria para el nodo.\n");
+        exit(EXIT_FAILURE);
+    }
+    new_node->key = duplicate_string(key);
+    new_node->value = duplicate_string(value);
+    new_node->next = NULL;
+    return new_node;
+}
+
+// 1. Inserción permitiendo claves repetidas por encadenamiento
+void insert(HashTable* ht, const char* key, const char* value) {
+    int index = hash_function(key);
+    Node* new_node = create_node(key, value);
+
+    
+    if (ht->table[index] == NULL) {
+        ht->table[index] = new_node;
+        return;
+    }
+
+    // Si hay colisión o clave repetida, insertamos al final de la lista
+    Node* current = ht->table[index];
+    while (current->next != NULL) {
+        current = current->next;
+    }
+    current->next = new_node;
+}
+
+// 2. Búsqueda en la tabla hash
+void search(HashTable* ht, const char* key) {
+    int index = hash_function(key);
+    Node* current = ht->table[index];
+    int found = 0;
+
+    printf("Buscando clave '%s' en el indice %d:\n", key, index);
+    while (current != NULL) {
+        if (strcmp(current->key, key) == 0) {
+            printf("  - Encontrado -> Valor: %s\n", current->value);
+            found = 1;
+        }
+        current = current->next;
+    }
+
+    if (!found) {
+        printf("  - Clave no encontrada.\n");
+    }
+}
+
+// 3. Eliminación de un nodo por clave (elimina la primera coincidencia)
+void delete_key(HashTable* ht, const char* key) {
+    int index = hash_function(key);
+    Node* current = ht->table[index];
+    Node* prev = NULL;
+
+    while (current != NULL) {
+        if (strcmp(current->key, key) == 0) {
+            if (prev == NULL) {
+                // El nodo a eliminar es el primero de la lista
+                ht->table[index] = current->next;
+            } else {
+                prev->next = current->next;
+            }
+
+            // Liberación de memoria del nodo y sus cadenas
+            free(current->key);
+            free(current->value);
+            free(current);
+
+            printf("Clave '%s' eliminada con exito del indice %d.\n", key, index);
+            return;
+        }
+        prev = current;
+        current = current->next;
+    }
+
+    printf("No se pudo eliminar: la clave '%s' no existe.\n", key);
+}
+
+// 4. Liberación total de la memoria
+void free_table(HashTable* ht) {
+    if (ht == NULL) return;
+
+    for (int i = 0; i < TABLE_SIZE; i++) {
+        Node* current = ht->table[i];
+        while (current != NULL) {
+            Node* temp = current;
+            current = current->next;
+
+            // Liberar las cadenas internas y luego el nodo
+            free(temp->key);
+            free(temp->value);
+            free(temp);
+        }
+        ht->table[i] = NULL;
+    }
+    free(ht);
+    printf("\nMemoria de la tabla hash liberada correctamente.\n");
+}
+
+// Función auxiliar para imprimir el estado de la tabla
+void print_table(HashTable* ht) {
+    printf("\n--- Estado de la Tabla Hash ---\n");
+    for (int i = 0; i < TABLE_SIZE; i++) {
+        printf("[%d]: ", i);
+        Node* current = ht->table[i];
+        while (current != NULL) {
+            printf("(%s, %s) -> ", current->key, current->value);
+            current = current->next;
+        }
+        printf("NULL\n");
+    }
+    printf("-------------------------------\n\n");
+}
+
+int main() {
+    
+    HashTable* ht = create_table();
+
+    // --- PRUEBAS DE INSERCIÓN Y COLISIONES ---
+    printf("=== PRUEBAS DE INSERCION ===\n");
+    insert(ht, "Juan", "Ingeniero");
+    insert(ht, "Pedro", "Doctor");
+    
+    // Inserción con clave repetida (misma clave, diferente valor)
+    insert(ht, "Juan", "Profesor"); 
+
+    print_table(ht);
+
+    // --- PRUEBAS DE BÚSQUEDA ---
+    printf("=== PRUEBAS DE BUSQUEDA ===\n");
+    search(ht, "Juan");
+    search(ht, "Maria");
+
+    // --- PRUEBAS DE BORRADO ---
+    printf("\n=== PRUEBAS DE BORRADO ===\n");
+    delete_key(ht, "Juan"); // Elimina la primera aparición de "Juan"
+    print_table(ht);
+
+    // --- LIBERACIÓN DE MEMORIA ---
+    free_table(ht);
+
+    return 0;
+}
