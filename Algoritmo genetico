@@ -1,0 +1,107 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <time.h>
+
+#define N 50
+#define BITS 16
+#define A -5.12
+#define B 5.12
+#define PC 0.9
+#define PM 0.1
+#define GEN 100
+#define PI 3.14159265358979323846
+
+typedef struct {
+    unsigned int x;
+    unsigned int y;
+    double f;
+} Ind;
+
+double decodificar(unsigned int g, int bits, double a, double b) {
+    return a + ((double)g / ((1 << bits) - 1)) * (b - a);
+}
+
+double rastrigin(double x, double y) {
+    return 20 + (x*x - 10*cos(2*PI*x)) + (y*y - 10*cos(2*PI*y));
+}
+
+void evaluar(Ind *ind) {
+    double x = decodificar(ind->x, BITS, A, B);
+    double y = decodificar(ind->y, BITS, A, B);
+    ind->f = rastrigin(x, y);
+}
+
+int cmp(const void *a, const void *b) {
+    double fa = ((Ind*)a)->f;
+    double fb = ((Ind*)b)->f;
+    if (fa < fb) return -1;
+    if (fa > fb) return 1;
+    return 0;
+}
+
+void cruzar(Ind p1, Ind p2, Ind *h1, Ind *h2) {
+    int point = rand() % BITS;
+    unsigned int mask = (1 << point) - 1;
+    h1->x = (p1.x & mask) | (p2.x & ~mask);
+    h1->y = (p1.y & mask) | (p2.y & ~mask);
+    h2->x = (p2.x & mask) | (p1.x & ~mask);
+    h2->y = (p2.y & mask) | (p1.y & ~mask);
+}
+
+void mutar(Ind *ind) {
+    if ((double)rand() / RAND_MAX < PM) {
+        int bit = rand() % BITS;
+        ind->x ^= (1 << bit);
+    }
+    if ((double)rand() / RAND_MAX < PM) {
+        int bit = rand() % BITS;
+        ind->y ^= (1 << bit);
+    }
+}
+
+int main() {
+    srand(time(NULL));
+    Ind pob[N];
+
+    for (int i = 0; i < N; i++) {
+        pob[i].x = rand() & ((1 << BITS) - 1);
+        pob[i].y = rand() & ((1 << BITS) - 1);
+        evaluar(&pob[i]);
+    }
+
+    for (int gen = 0; gen < GEN; gen++) {
+        Ind hijos[N];
+
+        for (int i = 0; i < N; i += 2) {
+            int p1 = rand() % N;
+            int p2 = rand() % N;
+
+            if ((double)rand() / RAND_MAX < PC) {
+                cruzar(pob[p1], pob[p2], &hijos[i], &hijos[i+1]);
+            } else {
+                hijos[i] = pob[p1];
+                hijos[i+1] = pob[p2];
+            }
+
+            mutar(&hijos[i]);
+            mutar(&hijos[i+1]);
+            evaluar(&hijos[i]);
+            evaluar(&hijos[i+1]);
+        }
+
+        Ind todos[2*N];
+        for (int i = 0; i < N; i++) todos[i] = pob[i];
+        for (int i = 0; i < N; i++) todos[N+i] = hijos[i];
+
+        qsort(todos, 2*N, sizeof(Ind), cmp);
+
+        for (int i = 0; i < N; i++) pob[i] = todos[i];
+    }
+
+    printf("Mejor f(x,y) = %f\n", pob[0].f);
+    printf("x = %f\n", decodificar(pob[0].x, BITS, A, B));
+    printf("y = %f\n", decodificar(pob[0].y, BITS, A, B));
+
+    return 0;
+}
